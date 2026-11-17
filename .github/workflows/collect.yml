@@ -30,9 +30,15 @@ jobs:
           git config user.name "youbike-bot"
           git config user.email "actions@users.noreply.github.com"
           for i in 1 2 3 4 5 6; do
-            python collect.py || echo "fetch failed, skip this round"
-            git add data/
-            git diff --cached --quiet || git commit -m "data $(TZ=Asia/Taipei date +'%F %H:%M')"
-            git pull --rebase && git push || echo "push failed, retry next round"
+            for attempt in 1 2 3; do
+              git fetch -q origin main
+              git reset -q --hard origin/main
+              python collect.py || { echo "fetch failed"; break; }
+              git add data/
+              git commit -q -m "data $(TZ=Asia/Taipei date +'%F %H:%M')" || break
+              if git push -q origin HEAD:main; then echo "saved"; break; fi
+              echo "push conflict, retry $attempt"
+              sleep 5
+            done
             if [ $i -lt 6 ]; then sleep 540; fi
           done
